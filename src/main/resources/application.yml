@@ -1,0 +1,18 @@
+spring:
+  application:
+    name: quadstore
+
+  flyway:
+    schemas: quadstore
+
+  jackson:
+    default-property-inclusion: NON_NULL
+
+  dataSource:
+    url: jdbc:postgresql://localhost:5432/quadstore?createDatabaseIfNotExist=true
+    username: quadsmgr
+    password: quadsmgr
+    hikari:
+      maxIdle: 10
+      max-active: 50
+      max-wait: 10000
