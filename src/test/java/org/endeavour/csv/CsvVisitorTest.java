@@ -5,14 +5,20 @@ import org.endeavourhealth.dao.Graph;
 import org.endeavourhealth.dao.Node;
 import org.endeavourhealth.tables.records.NodeRecord;
 import org.jetbrains.annotations.Nullable;
+import org.jooq.JSON;
 import org.jooq.Record1;
+import org.jooq.impl.DSL;
 import org.junit.Test;
 
 import java.io.IOException;
+import java.util.Optional;
 import java.util.UUID;
 
 import static org.endeavourhealth.Keys.NODE__NON_NULL_PERSON_FK;
 import static org.endeavourhealth.Tables.*;
+import static org.jooq.JSON.json;
+import static org.jooq.impl.DSL.jsonValue;
+import static org.jooq.impl.DSL.val;
 import static org.junit.Assert.*;
 
 public class CsvVisitorTest extends TestPersistenceAccess {
@@ -45,5 +51,12 @@ public class CsvVisitorTest extends TestPersistenceAccess {
                 .where(CONCEPT_HIERARCHY.HIERARCHY.contains(new String[]{"404684003"}))
                 .fetchOne();
         assertEquals(node.getId(), nodeId.value1());
+        //see https://www.jooq.org/doc/latest/manual/sql-building/column-expressions/json-functions/json-value-function/ and
+        // https://www.postgresql.org/docs/12/functions-json.html for details and syntax
+        Record1<JSON> value = this.context()
+                .select(jsonValue(DSL.cast(NODE.PROPERTIES, JSON.class), "$.valueQuantity.value"))
+                .from(NODE)
+                .fetchOne();
+        assertEquals(Double.valueOf(value.get(0).toString()), Optional.of(0.0).get());
     }
 }
