@@ -29,6 +29,7 @@ public abstract class TestPersistenceAccess implements PersistenceAccess {
     protected DefaultConfiguration defaultConfiguration;
 
     @ClassRule
+    //see https://github.com/opentable/otj-pg-embedded
     public static PreparedDbRule db = EmbeddedPostgresRules
             .preparedDatabase(FlywayPreparer.forClasspathLocation("db/migration"));
 

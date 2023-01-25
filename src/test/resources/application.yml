@@ -16,3 +16,6 @@ spring:
       maxIdle: 10
       max-active: 50
       max-wait: 10000
+
+  hermes:
+    snomedBaseUrl: http://localhost:8088/v1/snomed/concepts

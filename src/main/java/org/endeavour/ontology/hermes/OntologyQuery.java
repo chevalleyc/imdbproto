@@ -1,27 +1,35 @@
 package org.endeavour.ontology.hermes;
 
 import com.google.gson.Gson;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import javax.ws.rs.client.Client;
 import javax.ws.rs.client.ClientBuilder;
 import javax.ws.rs.client.WebTarget;
 import javax.ws.rs.core.UriBuilder;
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
 
 public class OntologyQuery {
 
+    public static final String HERMES_SNOMED_BASE_URL = "hermes.snomed_base_url";
     WebTarget webTarget;
     Map<String, List> actual;
-    public static String SCTID_IS_A = "116680003";
+    public static final String SCTID_IS_A = "116680003";
     String baseUrl;
-    private final String sctCode;
+    private String sctCode;
+    private Logger logger = LoggerFactory.getLogger(this.getClass().getName());
 
-    public OntologyQuery(String sctCode) throws IOException {
-        this.sctCode = sctCode;
-        baseUrl = new OntologyProperties().init("hermes").propertyValue("hermes.snomed_base_url");
+    public OntologyQuery() throws IOException {
+        baseUrl = new OntologyProperties().init().propertyValue(HERMES_SNOMED_BASE_URL);
+    }
+
+    public OntologyQuery(String propertyFilePath) throws IOException {
+        baseUrl = new OntologyProperties(propertyFilePath).init().propertyValue(HERMES_SNOMED_BASE_URL);
     }
 
     private WebTarget buildWebTarget(UriBuilder uriBuilder){
@@ -36,13 +44,20 @@ public class OntologyQuery {
     public OntologyQuery extended(){
         UriBuilder uriBuilder = UriBuilder.fromPath(baseUrl+"/"+sctCode+"/extended");
         buildWebTarget(uriBuilder);
-        String result = webTarget.request().get(String.class);
-        actual = new Gson().fromJson(result, Map.class);
+        try {
+            String result = webTarget.request().get(String.class);
+            actual = new Gson().fromJson(result, Map.class);
+        } catch (Exception e){
+            logger.warn("Could not process extended with error:"+e.getMessage());
+        }
         return this;
     }
 
     public List<String> getIsA(){
-        return  ((List<Double>) actual.get(SCTID_IS_A)).stream().map(op -> String.format("%.0f",op)).collect(Collectors.toList());
+        if (actual == null)
+            return new ArrayList<>();
+
+        return  ((List<Double>) actual.get(SCTID_IS_A)).stream().map(op -> String.format("%.0f",op)).toList();
     }
 
     public List<String> getListWithCode(String code){
@@ -50,5 +65,8 @@ public class OntologyQuery {
     }
 
 
-
+    public OntologyQuery forCode(String code) {
+        this.sctCode = code;
+        return this;
+    }
 }
