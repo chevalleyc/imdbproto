@@ -46,57 +46,63 @@ public class CsvVisitor {
         for (CSVRecord csvRecord : records) {
             String resourceData = csvRecord.get("resource_data");
 
-            if (resumeAfterResourceId != null && !csvRecord.get(RESOURCE_ID).equals(resumeAfterResourceId)){
-                continue;
-            }
-            else if (resumeAfterResourceId != null && csvRecord.get(RESOURCE_ID).equals(resumeAfterResourceId)){
-                resumeAfterResourceId = null;
+            if (shouldSkipRecord(resumeAfterResourceId, csvRecord)) {
                 continue;
             }
 
-            if (verbose)
-                logger.debug("processing resource id:"+csvRecord.get(RESOURCE_ID)+", type:"+csvRecord.get("resource_type"));
+            if (verbose) {
+                logger.debug("processing resource id:" + csvRecord.get(RESOURCE_ID) + ", type:" + csvRecord.get("resource_type"));
+            }
 
-            if (!resourceData.isEmpty()){
-                //invoke a visitor for this FHIR resource
+            if (!resourceData.isEmpty()) {
                 ResourceVisitor resourceVisitor = ResourceVisitorFactory.getInstance(ResourceFormat.DSTU2).traverse(resourceData);
-
-
-                //get the "code" section
-                ArbitraryJson arbitraryJson = JsonHandlerFactory.getInstance(ResourceFormat.DSTU2, resourceData).generate();
-                ArbitraryJson codingStruct = arbitraryJson.propertyStructure("code").propertyStructure("coding");
-
-                AtomicReference<ConceptExpanded> expandedAtomicReference = new AtomicReference<>();
-
-                //resolve coding if any
-                if (codingStruct != null) {
-                    codingStruct.valuesIterator().forEachRemaining(object -> {
-                        ArbitraryJson coding = JsonHandlerFactory.getInstance(ResourceFormat.DSTU2, object);
-
-                        CodeItem codeItem = new CodeItem(coding).extract();
-                        String code = codeItem.getCode();
-                        String system = codeItem.getSystem();
-                        String display = codeItem.getDisplay();
-
-                        if (system.equals("http://snomed.info/sct")) {
-                            //get expanded codes
-                            ConceptExpanded conceptExpanded = new ConceptExpanded(code, system, display);
-                            conceptExpanded.setExpanded(ontologyQuery.forCode(code).extended().getIsA());
-                            expandedAtomicReference.set(conceptExpanded);
-                        }
-
-                    });
-                }
+                ConceptExpanded expandedConcept = extractExpandedConcept(resourceData, ontologyQuery);
                 Node node = NodeFactory.getInstance(persistenceAccess).setFromResource(resourceVisitor);
 
-                if (expandedAtomicReference.get() != null){
-                    node.setIri("http://snomed.info/sct#"+expandedAtomicReference.get().getCode());
-                    node.setConceptExpanded(expandedAtomicReference.get());
+                if (expandedConcept != null) {
+                    node.setIri("http://snomed.info/sct#" + expandedConcept.getCode());
+                    node.setConceptExpanded(expandedConcept);
                 }
                 node.persist();
                 graph.shallowCreateFromReferences(node, resourceVisitor);
             }
         }
+
+    }
+
+    private boolean shouldSkipRecord(String resumeAfterResourceId, CSVRecord csvRecord) {
+        if (resumeAfterResourceId == null) {
+            return false;
+        }
+
+        if (!csvRecord.get(RESOURCE_ID).equals(resumeAfterResourceId)) {
+            return true;
+        }
+
+        return true;
+    }
+
+    private ConceptExpanded extractExpandedConcept(String resourceData,  OntologyQuery ontologyQuery) {
+        ArbitraryJson arbitraryJson = JsonHandlerFactory.getInstance(ResourceFormat.DSTU2, resourceData).generate();
+        ArbitraryJson codingStruct = arbitraryJson.propertyStructure("code").propertyStructure("coding");
+
+        if (codingStruct == null) {
+            return null;
+        }
+
+        AtomicReference<ConceptExpanded> expandedAtomicReference = new AtomicReference<>();
+        codingStruct.valuesIterator().forEachRemaining(object -> {
+            ArbitraryJson coding = JsonHandlerFactory.getInstance(ResourceFormat.DSTU2, object);
+            CodeItem codeItem = new CodeItem(coding).extract();
+
+            if (codeItem.getSystem().equals("http://snomed.info/sct")) {
+                ConceptExpanded conceptExpanded = new ConceptExpanded(codeItem.getCode(), codeItem.getSystem(), codeItem.getDisplay());
+                conceptExpanded.setExpanded(ontologyQuery.forCode(codeItem.getCode()).extended().getIsA());
+                expandedAtomicReference.set(conceptExpanded);
+            }
+        });
+
+        return expandedAtomicReference.get();
     }
 
     public void setResumeAfterResourceId(String rf) {

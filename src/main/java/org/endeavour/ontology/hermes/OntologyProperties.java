@@ -6,7 +6,6 @@ import org.springframework.context.annotation.Configuration;
 
 import java.io.FileInputStream;
 import java.io.IOException;
-import java.io.InputStream;
 import java.util.Properties;
 
 @Configuration
@@ -15,7 +14,7 @@ import java.util.Properties;
 public class OntologyProperties {
 
     private Properties ontologyProps;
-    private String configPath;
+    private final String configPath;
 
     public OntologyProperties() {
         String rootPath = Thread.currentThread().getContextClassLoader().getResource("").getPath();
@@ -26,20 +25,15 @@ public class OntologyProperties {
         configPath = propertyFilePath;
     }
 
-    public OntologyProperties init() throws IOException {
+    public OntologyProperties init() {
 
         ontologyProps = new Properties();
-        InputStream inputStream = null;
-        try {
-            inputStream = new FileInputStream(configPath);
-            ontologyProps.load(inputStream);
-        } catch (Exception e){
-            throw new IllegalArgumentException(e.getMessage());
-        } finally {
-            if (inputStream != null)
-            inputStream.close();
-        }
 
+        try (FileInputStream inputStream = new FileInputStream(configPath)) {
+            ontologyProps.load(inputStream);
+        } catch (Exception e) {
+            throw new IllegalArgumentException(e.getMessage());
+        }
         return this;
     }
 
